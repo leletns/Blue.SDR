@@ -4,358 +4,315 @@ import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseUpload
-from datetime import datetime, time as dt_time
+from datetime import datetime
 import google.generativeai as genai
 import plotly.express as px
 import time
 
-# --- CONFIGURAÇÃO DA PÁGINA (ELITE EDITION) ---
+# --- 1. CONFIGURAÇÃO INICIAL ---
 st.set_page_config(
-    page_title="Blue . SDR | Elite Intelligence",
-    page_icon="💠",
+    page_title="blue . system",
+    page_icon=None, # Sem ícone
     layout="wide",
-    initial_sidebar_state="expanded"
+    initial_sidebar_state="collapsed"
 )
 
-# --- CSS DE LUXO (DARK & GOLD THEME) ---
+# --- 2. SISTEMA DE LOGIN (CLEAN) ---
+def check_password():
+    def password_entered():
+        if st.session_state["password"] == st.secrets["auth"]["SENHA_SISTEMA"]:
+            st.session_state["password_correct"] = True
+            del st.session_state["password"]
+        else:
+            st.session_state["password_correct"] = False
+
+    if st.session_state.get("password_correct", False):
+        return True
+
+    # TELA DE LOGIN (Minimalista)
+    st.markdown("""
+    <style>
+    .stApp {background-color: #050505;}
+    .login-title {
+        font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+        font-weight: 300;
+        font-size: 3rem;
+        color: white;
+        text-align: center;
+        margin-bottom: 0px;
+        letter-spacing: -1px;
+    }
+    .blue-dot { color: #4da6ff; font-weight: bold; }
+    </style>
+    """, unsafe_allow_html=True)
+
+    col1, col2, col3 = st.columns([1, 2, 1])
+    with col2:
+        st.markdown("<br><br><br>", unsafe_allow_html=True)
+        st.markdown("<div class='login-title'>blue <span class='blue-dot'>.</span></div>", unsafe_allow_html=True)
+        st.markdown("<p style='text-align: center; color: #666; font-size: 0.8rem; letter-spacing: 2px; text-transform: uppercase;'>Restricted Environment</p>", unsafe_allow_html=True)
+        
+        st.text_input(
+            "AUTHENTICATION KEY", 
+            type="password", 
+            on_change=password_entered, 
+            key="password",
+            label_visibility="collapsed",
+            placeholder="Enter access key..."
+        )
+        
+        if "password_correct" in st.session_state:
+            st.markdown("<p style='text-align: center; color: #ff4b4b; font-size: 0.8rem;'>ACCESS DENIED</p>", unsafe_allow_html=True)
+
+    return False
+
+if not check_password():
+    st.stop()
+
+# ==============================================================================
+# 🚀 ÁREA SEGURA
+# ==============================================================================
+
+# --- 3. CSS DE ELITE (CLEAN & THIN) ---
 st.markdown("""
     <style>
-    /* Fundo Principal */
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@200;400;600&display=swap');
+    
+    html, body, [class*="css"] {
+        font-family: 'Inter', 'Helvetica Neue', sans-serif;
+    }
+    
+    /* Fundo */
     .stApp {
-        background-color: #0a0e14; /* Azul noturno muito escuro */
+        background-color: #0a0a0a;
         color: #e0e0e0;
     }
+    
     /* Sidebar */
     section[data-testid="stSidebar"] {
-        background-color: #11161d;
-        border-right: 1px solid #1f2630;
+        background-color: #0f0f0f;
+        border-right: 1px solid #1a1a1a;
     }
-    /* Títulos e Acentos */
+    
+    /* Logo na Sidebar */
+    .sidebar-logo {
+        font-weight: 200; /* Thin */
+        font-size: 2rem;
+        color: white;
+        letter-spacing: -1px;
+    }
+    
+    /* Títulos */
     h1, h2, h3 {
         color: #ffffff !important;
-        font-family: 'Helvetica Neue', sans-serif;
-        font-weight: 600;
+        font-weight: 300 !important; /* Thin */
+        letter-spacing: -0.5px;
     }
-    .blue-dot { color: #4da6ff; font-weight: bold; font-size: 1.2em; } /* O ponto azul */
-    .gold-accent { color: #d4af37; } /* Dourado Elite */
+    
+    /* Inputs */
+    .stTextInput>div>div>input, .stTextArea>div>div>textarea, .stSelectbox>div>div>div, .stNumberInput>div>div>input {
+        background-color: #141414;
+        color: white;
+        border: 1px solid #333;
+        border-radius: 4px;
+    }
+    .stTextInput>div>div>input:focus, .stTextArea>div>div>textarea:focus {
+        border-color: #4da6ff;
+        box-shadow: none;
+    }
     
     /* Botões */
     .stButton>button {
         width: 100%;
-        border-radius: 8px;
+        border-radius: 4px;
         height: 3em;
-        background: linear-gradient(135deg, #003366 0%, #004080 100%); /* Gradiente Azul Nobre */
-        color: white;
+        background-color: #4da6ff;
+        color: black;
         border: none;
-        font-weight: bold;
-        transition: all 0.3s ease;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        font-size: 0.8rem;
+        transition: all 0.2s ease;
     }
     .stButton>button:hover {
-        background: linear-gradient(135deg, #004080 0%, #0059b3 100%);
-        box-shadow: 0 4px 15px rgba(77, 166, 255, 0.3);
+        background-color: #ffffff;
     }
     
-    /* Inputs e Textareas */
-    .stTextInput>div>div>input, .stTextArea>div>div>textarea, .stSelectbox>div>div>div, .stDateInput>div>div>input, .stTimeInput>div>div>input, .stNumberInput>div>div>input {
-        background-color: #1c232e;
-        color: white;
-        border: 1px solid #2d3748;
-        border-radius: 6px;
-    }
-    .stTextInput>div>div>input:focus, .stTextArea>div>div>textarea:focus {
-        border-color: #4da6ff;
-        box-shadow: 0 0 0 1px #4da6ff;
-    }
-    
-    /* Dataframes e Tabelas */
-    div[data-testid="stDataFrame"] {
-        background-color: #1c232e;
-        padding: 15px;
-        border-radius: 10px;
-        border: 1px solid #2d3748;
-    }
-    
-    /* Métricas (Cards) */
+    /* Métricas */
     div[data-testid="metric-container"] {
-        background-color: #1c232e;
+        background-color: #141414;
         padding: 20px;
-        border-radius: 10px;
-        border-left: 4px solid #d4af37; /* Acento Dourado */
-        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+        border-radius: 0px;
+        border-left: 1px solid #333;
     }
-    label[data-testid="stMetricLabel"] { color: #a0aec0; }
-    div[data-testid="stMetricValue"] { color: #ffffff; font-weight: 700; }
+    label[data-testid="stMetricLabel"] { 
+        color: #666; 
+        font-size: 0.7rem; 
+        text-transform: uppercase; 
+        letter-spacing: 1px;
+    }
+    div[data-testid="stMetricValue"] { color: #fff; font-weight: 300; }
 
     /* Rodapé */
     .footer {
         position: fixed; left: 0; bottom: 0; width: 100%;
-        background-color: #0a0e14; color: #808495;
-        text-align: center; padding: 15px; font-size: 12px;
-        border-top: 1px solid #1f2630; z-index: 999;
+        background-color: #0a0a0a; color: #444;
+        text-align: center; padding: 20px; font-size: 10px;
+        text-transform: uppercase; letter-spacing: 2px;
+        border-top: 1px solid #1a1a1a; z-index: 999;
     }
     </style>
     """, unsafe_allow_html=True)
 
-# 🔴 🔴 CONFIGURAÇÃO DO DRIVE: COLE O ID DA SUA PASTA AQUI 🔴 🔴
-DRIVE_FOLDER_ID = "19B6Kl5M4A1VFWs_9ctlrojm72o56Wg3E?usp=drive_link"
+# 🔴 CONFIGURAÇÃO DO DRIVE 🔴
+DRIVE_FOLDER_ID = "19B6Kl5M4A1VFWs_9ctlrojm72o56Wg3E?usp=drive_link" 
 
-# --- CONEXÕES SEGURAS (Sheets, Drive, AI) ---
+# --- 4. CONEXÕES ---
 @st.cache_resource
 def conectar_servicos():
     try:
-        # Escopos para Sheets e Drive
-        scope = [
-            "https://www.googleapis.com/auth/spreadsheets",
-            "https://www.googleapis.com/auth/drive"
-        ]
+        scope = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
         creds_dict = dict(st.secrets["gcp_service_account"])
         creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
-        
-        # Cliente Sheets
         client_sheets = gspread.authorize(creds)
         sheet_leads = client_sheets.open("BlueTrack_DB").sheet1
-        # Tenta abrir a aba de pagamentos, se não existir, avisa.
         try:
             sheet_pagamentos = client_sheets.open("BlueTrack_DB").worksheet("Pagamentos")
         except:
             sheet_pagamentos = None
-            st.error("⚠️ Aba 'Pagamentos' não encontrada na planilha. Crie-a para usar a nova função.")
-
-        # Serviço Drive
         drive_service = build('drive', 'v3', credentials=creds)
-        
-        # Configurar Gemini AI
         genai.configure(api_key=st.secrets["general"]["GOOGLE_API_KEY"])
-        
-        return sheet_leads, sheet_pagamentos, drive_service, True
-    except Exception as e:
-        return None, None, None, str(e)
+        return sheet_leads, sheet_pagamentos, drive_service
+    except:
+        return None, None, None
 
-sheet_leads, sheet_pagamentos, drive_service, status_conexao = conectar_servicos()
+sheet_leads, sheet_pagamentos, drive_service = conectar_servicos()
 
-# --- FUNÇÃO DE UPLOAD PARA O DRIVE ---
+# --- 5. FUNÇÕES ---
 def upload_to_drive(file_obj, folder_id, drive_service):
     try:
-        file_metadata = {
-            'name': f"Comprovante_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{file_obj.name}",
-            'parents': [folder_id]
-        }
+        file_metadata = {'name': f"DOC_{datetime.now().strftime('%Y%m%d')}_{file_obj.name}", 'parents': [folder_id]}
         media = MediaIoBaseUpload(file_obj, mimetype=file_obj.type, resumable=True)
         file = drive_service.files().create(body=file_metadata, media_body=media, fields='id, webViewLink').execute()
         return file.get('webViewLink')
-    except Exception as e:
-        st.error(f"Erro no upload para o Drive: {e}")
+    except:
         return None
 
-# --- CÉREBRO DA IA (Blue . Brain) ---
 def analisar_conversa_pro(texto):
     model = genai.GenerativeModel('gemini-pro')
     prompt = f"""
-    Aja como o sistema Blue . SDR, inteligência comercial de elite para tickets altos.
-    Analise a transcrição com foco em qualificação e fechamento.
-    
-    SAÍDA ESTRITAMENTE NO FORMATO SEPARADO POR PIPE (|):
-    NOME|CARGO_OU_ORIGEM|TEMPERATURA (Frio/Morno/Quente/Fechado)|DOR_PRINCIPAL_E_OBJECAO|PROXIMO_PASSO_ESTRATEGICO|SUGESTAO_RESPOSTA_COPYWRITING_DE_ELITE
-    
-    Conversa:
-    {texto}
+    SYSTEM: blue . intelligent analysis.
+    Analyze the following high-ticket sales conversation.
+    OUTPUT FORMAT (Pipe separated):
+    NAME|ORIGIN|TEMPERATURE (Cold/Warm/Hot/Closed)|MAIN PAIN|NEXT STEP|SUGGESTED REPLY (No emojis, professional tone)
+    Conversation: {texto}
     """
     try:
         response = model.generate_content(prompt)
         return response.text
     except:
-        return "Erro|Erro|Erro|Erro|Erro|Erro"
+        return "Error|Error|Error|Error|Error|Error"
 
-# --- SIDEBAR (MENU DE ELITE) ---
-st.sidebar.markdown("## Blue <span class='blue-dot'>.</span> SDR", unsafe_allow_html=True)
-st.sidebar.caption("Revenue Intelligence | Elite Edition")
+# --- 6. SIDEBAR ---
+st.sidebar.markdown("<div class='sidebar-logo'>blue <span style='color:#4da6ff; font-weight:bold'>.</span></div>", unsafe_allow_html=True)
+st.sidebar.markdown("<p style='color:#666; font-size: 10px; letter-spacing: 2px; margin-top: -10px;'>INTELLIGENCE SYSTEM</p>", unsafe_allow_html=True)
 st.sidebar.markdown("---")
-menu = st.sidebar.radio("Navegação Exclusiva", ["Dashboard Executivo", "Análise de Conversa (IA)", "Gestão de Pagamentos 💰", "Banco de Dados Seguro"])
-st.sidebar.markdown("---")
-with st.sidebar.expander("Sobre o Sistema"):
-    st.info("Sistema de inteligência proprietário desenvolvido para maximizar conversões de alto valor.")
+menu = st.sidebar.radio("MENU", ["DASHBOARD", "INTELLIGENCE AI", "PAYMENTS VAULT", "DATABASE"], label_visibility="collapsed")
 
-# --- PÁGINA: DASHBOARD EXECUTIVO ---
-if menu == "Dashboard Executivo":
-    st.title("📊 Visão Estratégica da Diretoria")
-    st.markdown("Monitoramento em tempo real do pipeline de alta performance.")
-    
-    if sheet_leads:
-        dados = sheet_leads.get_all_records()
-        df = pd.DataFrame(dados)
-        
-        if not df.empty:
-            # KPIs de Elite
-            col1, col2, col3, col4 = st.columns(4)
-            total = len(df)
-            # Filtra status de forma robusta
-            status_upper = df['Status'].astype(str).str.upper()
-            quentes = len(df[status_upper == 'QUENTE'])
-            fechados = len(df[status_upper == 'FECHADO'])
-            conversao = (fechados / total * 100) if total > 0 else 0
-            
-            col1.metric("Total de Leads", total, help="Volume total no pipeline")
-            col2.metric("🔥 Pipeline Quente", quentes, f"{quentes/total*100:.0f}% do total", help="Leads prontos para fechamento")
-            col3.metric("💎 Vendas Fechadas", fechados, help="Negócios concretizados")
-            col4.metric("Taxa de Conversão Global", f"{conversao:.1f}%", help="Eficiência do funil")
-            
-            st.markdown("---")
-            
-            # Gráficos de Elite
-            c1, c2 = st.columns(2)
-            with c1:
-                st.subheader("Health Score do Pipeline")
-                # Cores personalizadas para o tema Elite
-                colors = {'QUENTE': '#d4af37', 'FECHADO': '#4da6ff', 'MORNO': '#a0aec0', 'FRIO': '#4a5568'}
-                fig_pie = px.pie(df, names='Status', hole=0.5, color='Status', color_discrete_map=colors)
-                fig_pie.update_layout(
-                    plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)',
-                    font_color='#e0e0e0', showlegend=True
-                )
-                st.plotly_chart(fig_pie, use_container_width=True)
-            
-            with c2:
-                st.subheader("Performance Recente")
-                if 'Data' in df.columns:
-                    st.info("Gráfico temporal em desenvolvimento para próxima versão.")
-                    # Placeholder para gráfico de linha futuro
-                    st.line_chart(df['Status'].value_counts()) 
-                else:
-                    st.info("Dados temporais insuficientes.")
-        else:
-            st.info("Aguardando dados para gerar intelligence.")
+# --- 7. PÁGINAS ---
 
-# --- PÁGINA: ANÁLISE COM IA ---
-elif menu == "Análise de Conversa (IA)":
-    st.title("🧠 Blue <span class='blue-dot'>.</span> Intelligence Hub", unsafe_allow_html=True)
-    st.markdown("Cole a interação com o cliente para decodificação estratégica instantânea.")
-    
-    col_input, col_result = st.columns([1.2, 1])
-    
-    with col_input:
-        texto_chat = st.text_area("📝 Transcrição da Conversa", height=450, placeholder="Cole aqui o WhatsApp, E-mail ou Direct...")
-        btn_analisar = st.button("💠 PROCESSAR DADOS COM IA")
-    
-    with col_result:
-        if btn_analisar and texto_chat:
-            with st.spinner("Decodificando padrões de compra..."):
-                resultado = analisar_conversa_pro(texto_chat)
-                partes = resultado.split('|')
-                
-                if len(partes) >= 6:
-                    st.success("✅ Análise Estratégica Concluída")
-                    
-                    st.subheader(f"👤 Lead: {partes[0]}")
-                    st.caption(f"Origem/Cargo: {partes[1]}")
-                    
-                    temp = partes[2].strip().upper()
-                    cor_temp = "gold-accent" if temp in ['QUENTE', 'FECHADO'] else "blue-dot"
-                    st.markdown(f"### Status: <span class='{cor_temp}'>{temp}</span>", unsafe_allow_html=True)
-                    
-                    with st.expander("🔍 Diagnóstico & Dor Principal", expanded=True):
-                        st.write(partes[3])
-                    
-                    with st.expander("🚀 Próximo Passo Estratégico", expanded=True):
-                        st.write(f"**Ação:** {partes[4]}")
-                    
-                    st.markdown("### 💬 Copywriting de Resposta Sugerida")
-                    st.code(partes[5], language="text")
-                    
-                    # Botão salvar
-                    if st.button("💾 Arquivar no Vault de Dados"):
-                        if sheet_leads:
-                            data_hora = datetime.now().strftime("%d/%m/%Y %H:%M")
-                            obs_full = f"Origem: {partes[1]} | Dor: {partes[3]} | Estratégia: {partes[4]}"
-                            sheet_leads.append_row([data_hora, partes[0], partes[2], 0, obs_full])
-                            st.toast("Lead arquivado com segurança no cofre de dados.", icon="🔒")
-                        else:
-                            st.error("Erro de conexão com o banco de dados.")
-                else:
-                    st.error("A IA precisa de mais contexto para uma análise de elite.")
-
-# --- NOVA PÁGINA: GESTÃO DE PAGAMENTOS (O COFRE) ---
-elif menu == "Gestão de Pagamentos 💰":
-    st.title("💎 Cofre de Pagamentos & Comprovantes")
-    st.markdown("Registro seguro de pagamentos antecipados e agendamentos confirmados.")
-    
-    if not sheet_pagamentos or not drive_service:
-        st.error("Módulo de pagamentos não configurado. Verifique a aba na planilha e a conexão com o Drive.")
-        st.stop()
-
-    # --- Formulário de Novo Pagamento ---
-    with st.expander("➕ Registrar Novo Pagamento Antecipado", expanded=True):
-        with st.form("form_pagamento", clear_on_submit=True):
-            c1, c2 = st.columns(2)
-            with c1:
-                nome_lead = st.text_input("👤 Nome do Lead/Cliente *")
-                valor_pgto = st.number_input("💰 Valor do Pagamento (R$)*", min_value=0.0, format="%.2f")
-                consultor = st.text_input("Requisitante/Consultor *")
-            with c2:
-                data_agendamento = st.date_input("📅 Data do Agendamento *")
-                hora_agendamento = st.time_input("⏰ Horário do Agendamento *")
-                agendamento_full = f"{data_agendamento.strftime('%d/%m/%Y')} às {hora_agendamento.strftime('%H:%M')}"
-            
-            obs_pgto = st.text_area("📝 Observações Adicionais")
-            arquivo_comprovante = st.file_uploader("📄 Upload do Comprovante (Imagem/PDF) *", type=['png', 'jpg', 'jpeg', 'pdf'])
-            
-            st.markdown("*Campos obrigatórios")
-            enviar_pgto = st.form_submit_button("🔒 Confirmar Pagamento & Arquivar Comprovante")
-            
-            if enviar_pgto:
-                if nome_lead and valor_pgto > 0 and consultor and arquivo_comprovante and DRIVE_FOLDER_ID != "19B6Kl5M4A1VFWs_9ctlrojm72o56Wg3E?usp=drive_link":
-                    with st.spinner("Criptografando e enviando para o Cofre Seguro..."):
-                        # 1. Upload para o Drive
-                        link_comprovante = upload_to_drive(arquivo_comprovante, DRIVE_FOLDER_ID, drive_service)
-                        
-                        if link_comprovante:
-                            # 2. Salvar na Planilha
-                            data_hoje = datetime.now().strftime("%d/%m/%Y")
-                            dados_pgto = [data_hoje, nome_lead, valor_pgto, consultor, agendamento_full, obs_pgto, link_comprovante]
-                            sheet_pagamentos.append_row(dados_pgto)
-                            st.success(f"Pagamento de {nome_lead} registrado com sucesso!")
-                            time.sleep(1)
-                            st.rerun() # Atualiza a tabela abaixo
-                        else:
-                            st.error("Falha no upload do comprovante. Tente novamente.")
-                else:
-                    st.warning("Preencha os campos obrigatórios e verifique o ID da pasta do Drive no código.")
-
-    st.markdown("---")
-    st.subheader("📜 Histórico de Transações")
-    
-    # --- Exibição da Tabela de Pagamentos ---
-    dados_pgto = sheet_pagamentos.get_all_records()
-    df_pgto = pd.DataFrame(dados_pgto)
-    
-    if not df_pgto.empty:
-        # Formatando a exibição
-        if 'Valor' in df_pgto.columns:
-            df_pgto['Valor'] = df_pgto['Valor'].apply(lambda x: f"R$ {float(x):,.2f}")
-        
-        # Criando coluna de link clicável
-        if 'Link Comprovante' in df_pgto.columns:
-            df_pgto['Comprovante'] = df_pgto['Link Comprovante'].apply(lambda x: f'<a href="{x}" target="_blank" style="text-decoration: none; color: #4da6ff; font-weight: bold;">👁️‍🗨️ Ver Arquivo</a>' if x else "-")
-            df_display = df_pgto.drop(columns=['Link Comprovante']) # Remove o link cru
-        else:
-            df_display = df_pgto
-
-        # Mostra tabela com HTML permitido para os links funcionarem
-        st.write(df_display.to_html(escape=False, index=False), unsafe_allow_html=True)
-    else:
-        st.info("Nenhum pagamento registrado no cofre ainda.")
-
-# --- PÁGINA: BANCO DE DADOS ---
-elif menu == "Banco de Dados Seguro":
-    st.title("📂 Vault de Dados Geral")
-    st.markdown("Acesso restrito à base completa de leads.")
+if menu == "DASHBOARD":
+    st.title("EXECUTIVE OVERVIEW")
     if sheet_leads:
         df = pd.DataFrame(sheet_leads.get_all_records())
-        st.dataframe(df, use_container_width=True, height=500)
+        if not df.empty:
+            c1, c2, c3, c4 = st.columns(4)
+            total = len(df)
+            quentes = len(df[df['Status'].astype(str).str.upper() == 'QUENTE'])
+            fechados = len(df[df['Status'].astype(str).str.upper() == 'FECHADO'])
+            conversao = (fechados/total*100) if total > 0 else 0
+            
+            c1.metric("TOTAL LEADS", total)
+            c2.metric("ACTIVE PIPELINE", quentes)
+            c3.metric("CLOSED DEALS", fechados)
+            c4.metric("CONVERSION RATE", f"{conversao:.1f}%")
+            
+            st.markdown("<br>", unsafe_allow_html=True)
+            col_graph1, col_graph2 = st.columns(2)
+            with col_graph1:
+                st.markdown("##### PIPELINE HEALTH")
+                fig = px.pie(df, names='Status', hole=0.6, color_discrete_sequence=['#4da6ff', '#ffffff', '#333333', '#111111'])
+                fig.update_layout(paper_bgcolor='rgba(0,0,0,0)', font_color='#666', showlegend=False)
+                st.plotly_chart(fig, use_container_width=True)
+        else:
+            st.info("NO DATA AVAILABLE")
 
-# --- RODAPÉ DE ELITE ---
+elif menu == "INTELLIGENCE AI":
+    st.title("CONVERSATION DECODER")
+    col_in, col_out = st.columns([1, 1])
+    with col_in:
+        txt = st.text_area("TRANSCRIPT INPUT", height=400, label_visibility="collapsed", placeholder="Paste conversation transcript here...")
+        if st.button("PROCESS DATA"):
+            with st.spinner("PROCESSING..."):
+                res = analisar_conversa_pro(txt)
+                st.session_state['analise_last'] = res.split('|')
+
+    with col_out:
+        if 'analise_last' in st.session_state and len(st.session_state['analise_last']) >= 6:
+            dados = st.session_state['analise_last']
+            st.markdown("##### ANALYSIS REPORT")
+            st.markdown(f"**LEAD:** {dados[0]} <br> **STATUS:** {dados[2]}", unsafe_allow_html=True)
+            st.markdown(f"<div style='background-color:#141414; padding:15px; border-left:2px solid #4da6ff; margin: 10px 0;'>{dados[3]}</div>", unsafe_allow_html=True)
+            st.markdown(f"**STRATEGY:** {dados[4]}")
+            st.text_area("SUGGESTED REPLY", value=dados[5], height=150)
+            
+            if st.button("ARCHIVE LEAD"):
+                ts = datetime.now().strftime("%d/%m/%Y %H:%M")
+                sheet_leads.append_row([ts, dados[0], dados[2], 0, f"Source: {dados[1]} | {dados[3]}"])
+                st.toast("DATA ARCHIVED")
+
+elif menu == "PAYMENTS VAULT":
+    st.title("PAYMENTS & ASSETS")
+    
+    if not sheet_pagamentos:
+        st.error("CONFIGURATION ERROR: MISSING 'Pagamentos' SHEET")
+    else:
+        with st.expander("REGISTER NEW TRANSACTION", expanded=True):
+            with st.form("pgto"):
+                c1, c2 = st.columns(2)
+                nome = c1.text_input("CLIENT NAME")
+                val = c1.number_input("VALUE", min_value=0.0)
+                data = c2.date_input("DATE")
+                hora = c2.time_input("TIME")
+                file = st.file_uploader("PROOF OF PAYMENT", type=['png','jpg','pdf'])
+                
+                if st.form_submit_button("CONFIRM UPLOAD"):
+                    if file and DRIVE_FOLDER_ID != "19B6Kl5M4A1VFWs_9ctlrojm72o56Wg3E?usp=drive_link":
+                        link = upload_to_drive(file, DRIVE_FOLDER_ID, drive_service)
+                        if link:
+                            sheet_pagamentos.append_row([datetime.now().strftime("%d/%m/%Y"), nome, val, "SDR", f"{data} {hora}", "Obs", link])
+                            st.success("TRANSACTION RECORDED")
+                            time.sleep(1)
+                            st.rerun()
+                    else:
+                        st.warning("CHECK DRIVE ID")
+        
+        st.markdown("<br>", unsafe_allow_html=True)
+        df_pg = pd.DataFrame(sheet_pagamentos.get_all_records())
+        if not df_pg.empty:
+            if 'Link Comprovante' in df_pg.columns:
+                df_pg['ASSET'] = df_pg['Link Comprovante'].apply(lambda x: f'<a href="{x}" target="_blank" style="color:#4da6ff; text-decoration:none;">VIEW DOC</a>')
+                st.write(df_pg.drop(columns=['Link Comprovante']).to_html(escape=False, index=False), unsafe_allow_html=True)
+
+elif menu == "DATABASE":
+    st.title("DATA VAULT")
+    if sheet_leads:
+        st.dataframe(pd.DataFrame(sheet_leads.get_all_records()), use_container_width=True)
+
+# --- 8. RODAPÉ DE GRIFE ---
 st.markdown("""
     <div class="footer">
-        🔒 Blue <span style='color:#4da6ff;'>.</span> SDR Systems | 256-bit End-to-End Encryption <br>
-        Exclusive High-Ticket Intelligence Engineered by <b>Leticia Nascimento</b> © 2024
+        blue <span style='color:#4da6ff; font-weight:bold'>.</span> system &nbsp;|&nbsp; restricted access &nbsp;|&nbsp; engineered by leticia nascimento &copy; 2024
     </div>
     """, unsafe_allow_html=True)
