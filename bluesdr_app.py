@@ -2,317 +2,190 @@ import streamlit as st
 import pandas as pd
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
-from googleapiclient.discovery import build
-from googleapiclient.http import MediaIoBaseUpload
 from datetime import datetime
 import google.generativeai as genai
 import plotly.express as px
 import time
 
-# --- 1. CONFIGURAÇÃO INICIAL ---
+# --- CONFIGURAÇÃO DA PÁGINA ---
 st.set_page_config(
-    page_title="blue . system",
-    page_icon=None, # Sem ícone
+    page_title="BlueSDR | Intelligence",
+    page_icon="💠",
     layout="wide",
-    initial_sidebar_state="collapsed"
+    initial_sidebar_state="expanded"
 )
 
-# --- 2. SISTEMA DE LOGIN (CLEAN) ---
-def check_password():
-    def password_entered():
-        if st.session_state["password"] == st.secrets["auth"]["SENHA_SISTEMA"]:
-            st.session_state["password_correct"] = True
-            del st.session_state["password"]
-        else:
-            st.session_state["password_correct"] = False
-
-    if st.session_state.get("password_correct", False):
-        return True
-
-    # TELA DE LOGIN (Minimalista)
-    st.markdown("""
-    <style>
-    .stApp {background-color: #050505;}
-    .login-title {
-        font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
-        font-weight: 300;
-        font-size: 3rem;
-        color: white;
-        text-align: center;
-        margin-bottom: 0px;
-        letter-spacing: -1px;
-    }
-    .blue-dot { color: #4da6ff; font-weight: bold; }
-    </style>
-    """, unsafe_allow_html=True)
-
-    col1, col2, col3 = st.columns([1, 2, 1])
-    with col2:
-        st.markdown("<br><br><br>", unsafe_allow_html=True)
-        st.markdown("<div class='login-title'>blue <span class='blue-dot'>.</span></div>", unsafe_allow_html=True)
-        st.markdown("<p style='text-align: center; color: #666; font-size: 0.8rem; letter-spacing: 2px; text-transform: uppercase;'>Restricted Environment</p>", unsafe_allow_html=True)
-        
-        st.text_input(
-            "AUTHENTICATION KEY", 
-            type="password", 
-            on_change=password_entered, 
-            key="password",
-            label_visibility="collapsed",
-            placeholder="Enter access key..."
-        )
-        
-        if "password_correct" in st.session_state:
-            st.markdown("<p style='text-align: center; color: #ff4b4b; font-size: 0.8rem;'>ACCESS DENIED</p>", unsafe_allow_html=True)
-
-    return False
-
-if not check_password():
-    st.stop()
-
-# ==============================================================================
-# 🚀 ÁREA SEGURA
-# ==============================================================================
-
-# --- 3. CSS DE ELITE (CLEAN & THIN) ---
+# --- CSS PRO ---
 st.markdown("""
     <style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@200;400;600&display=swap');
-    
-    html, body, [class*="css"] {
-        font-family: 'Inter', 'Helvetica Neue', sans-serif;
-    }
-    
-    /* Fundo */
-    .stApp {
-        background-color: #0a0a0a;
-        color: #e0e0e0;
-    }
-    
-    /* Sidebar */
-    section[data-testid="stSidebar"] {
-        background-color: #0f0f0f;
-        border-right: 1px solid #1a1a1a;
-    }
-    
-    /* Logo na Sidebar */
-    .sidebar-logo {
-        font-weight: 200; /* Thin */
-        font-size: 2rem;
-        color: white;
-        letter-spacing: -1px;
-    }
-    
-    /* Títulos */
-    h1, h2, h3 {
-        color: #ffffff !important;
-        font-weight: 300 !important; /* Thin */
-        letter-spacing: -0.5px;
-    }
-    
-    /* Inputs */
-    .stTextInput>div>div>input, .stTextArea>div>div>textarea, .stSelectbox>div>div>div, .stNumberInput>div>div>input {
-        background-color: #141414;
-        color: white;
-        border: 1px solid #333;
-        border-radius: 4px;
-    }
-    .stTextInput>div>div>input:focus, .stTextArea>div>div>textarea:focus {
-        border-color: #4da6ff;
-        box-shadow: none;
-    }
-    
-    /* Botões */
-    .stButton>button {
-        width: 100%;
-        border-radius: 4px;
-        height: 3em;
-        background-color: #4da6ff;
-        color: black;
-        border: none;
-        font-weight: 600;
-        text-transform: uppercase;
-        letter-spacing: 1px;
-        font-size: 0.8rem;
-        transition: all 0.2s ease;
-    }
-    .stButton>button:hover {
-        background-color: #ffffff;
-    }
-    
-    /* Métricas */
-    div[data-testid="metric-container"] {
-        background-color: #141414;
-        padding: 20px;
-        border-radius: 0px;
-        border-left: 1px solid #333;
-    }
-    label[data-testid="stMetricLabel"] { 
-        color: #666; 
-        font-size: 0.7rem; 
-        text-transform: uppercase; 
-        letter-spacing: 1px;
-    }
-    div[data-testid="stMetricValue"] { color: #fff; font-weight: 300; }
-
-    /* Rodapé */
-    .footer {
-        position: fixed; left: 0; bottom: 0; width: 100%;
-        background-color: #0a0a0a; color: #444;
-        text-align: center; padding: 20px; font-size: 10px;
-        text-transform: uppercase; letter-spacing: 2px;
-        border-top: 1px solid #1a1a1a; z-index: 999;
-    }
+    .main {background-color: #0E1117;}
+    .stButton>button {width: 100%; border-radius: 5px; height: 3em; background-color: #0068C9; color: white; font-weight: bold;}
+    h1, h2, h3 {color: #0068C9;}
+    .footer {position: fixed; left: 0; bottom: 0; width: 100%; background-color: #0E1117; color: #808495; text-align: center; padding: 10px; font-size: 12px; border-top: 1px solid #262730;}
     </style>
     """, unsafe_allow_html=True)
 
-# 🔴 CONFIGURAÇÃO DO DRIVE 🔴
-DRIVE_FOLDER_ID = "19B6Kl5M4A1VFWs_9ctlrojm72o56Wg3E?usp=drive_link" 
-
-# --- 4. CONEXÕES ---
-@st.cache_resource
-def conectar_servicos():
+# --- FUNÇÃO DE AUTO-CURA (RESOLVE O ERRO DE ABAS FALTANDO) ---
+def get_or_create_worksheet(sh, name):
     try:
-        scope = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
+        return sh.worksheet(name)
+    except:
+        # Se não achar a aba, CRIA ela automaticamente com cabeçalho
+        ws = sh.add_worksheet(title=name, rows=1000, cols=20)
+        if name == "Leads":
+            ws.append_row(["Data", "Nome", "Origem", "Status", "Dor", "Sugestão IA"])
+        elif name == "Pagamentos":
+            ws.append_row(["Data", "Cliente", "Valor", "Status", "Obs"])
+        return ws
+
+# --- CONEXÃO BLINDADA ---
+def conectar_sistema():
+    try:
+        # 1. Verifica se os segredos existem
+        if "gcp_service_account" not in st.secrets:
+            st.error("❌ ERRO CRÍTICO: Secrets não configurados no Streamlit Cloud.")
+            st.stop()
+
+        # 2. Prepara as credenciais (Corrige o erro de \n automaticamente)
         creds_dict = dict(st.secrets["gcp_service_account"])
+        creds_dict["private_key"] = creds_dict["private_key"].replace("\\n", "\n")
+
+        scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
         creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
-        client_sheets = gspread.authorize(creds)
-        sheet_leads = client_sheets.open("BlueTrack_DB").sheet1
-        try:
-            sheet_pagamentos = client_sheets.open("BlueTrack_DB").worksheet("Pagamentos")
-        except:
-            sheet_pagamentos = None
-        drive_service = build('drive', 'v3', credentials=creds)
-        genai.configure(api_key=st.secrets["general"]["GOOGLE_API_KEY"])
-        return sheet_leads, sheet_pagamentos, drive_service
-    except:
-        return None, None, None
+        client = gspread.authorize(creds)
 
-sheet_leads, sheet_pagamentos, drive_service = conectar_servicos()
+        # 3. Abre a planilha (TEM QUE SER O NOME EXATO)
+        sh = client.open("BlueTrack_DB")
 
-# --- 5. FUNÇÕES ---
-def upload_to_drive(file_obj, folder_id, drive_service):
-    try:
-        file_metadata = {'name': f"DOC_{datetime.now().strftime('%Y%m%d')}_{file_obj.name}", 'parents': [folder_id]}
-        media = MediaIoBaseUpload(file_obj, mimetype=file_obj.type, resumable=True)
-        file = drive_service.files().create(body=file_metadata, media_body=media, fields='id, webViewLink').execute()
-        return file.get('webViewLink')
-    except:
-        return None
+        # 4. Garante que as abas existem (Auto-Cura)
+        sheet_leads = get_or_create_worksheet(sh, "Leads")
+        sheet_pagamentos = get_or_create_worksheet(sh, "Pagamentos")
 
-def analisar_conversa_pro(texto):
+        # 5. Conecta IA
+        if "general" in st.secrets:
+            genai.configure(api_key=st.secrets["general"]["GOOGLE_API_KEY"])
+
+        return sheet_leads, sheet_pagamentos
+
+    except Exception as e:
+        st.error(f"🚨 ERRO DE CONEXÃO: {e}")
+        st.warning("👉 DICA: Verifique se você compartilhou a planilha 'BlueTrack_DB' com o email do robô (client_email) como EDITOR.")
+        st.stop() # Para tudo se der erro
+
+# Carrega conexões
+sheet_leads, sheet_pagamentos = conectar_sistema()
+
+# --- CÉREBRO DA IA ---
+def analisar_conversa(texto):
     model = genai.GenerativeModel('gemini-pro')
     prompt = f"""
-    SYSTEM: blue . intelligent analysis.
-    Analyze the following high-ticket sales conversation.
-    OUTPUT FORMAT (Pipe separated):
-    NAME|ORIGIN|TEMPERATURE (Cold/Warm/Hot/Closed)|MAIN PAIN|NEXT STEP|SUGGESTED REPLY (No emojis, professional tone)
-    Conversation: {texto}
+    Aja como o BlueSDR, um sistema de inteligência comercial de elite.
+    Analise a transcrição abaixo.
+    
+    SAÍDA ESTRITAMENTE NO FORMATO (separado por | ):
+    NOME|ORIGEM|TEMPERATURA|DOR_PRINCIPAL|ACAO_RECOMENDADA|RESPOSTA_COPYWRITING
+
+    Temperaturas: Frio, Morno, Quente, Fechado.
+    
+    Conversa:
+    {texto}
     """
     try:
         response = model.generate_content(prompt)
         return response.text
     except:
-        return "Error|Error|Error|Error|Error|Error"
+        return "Erro|Erro|Erro|Erro|Erro|Erro na IA"
 
-# --- 6. SIDEBAR ---
-st.sidebar.markdown("<div class='sidebar-logo'>blue <span style='color:#4da6ff; font-weight:bold'>.</span></div>", unsafe_allow_html=True)
-st.sidebar.markdown("<p style='color:#666; font-size: 10px; letter-spacing: 2px; margin-top: -10px;'>INTELLIGENCE SYSTEM</p>", unsafe_allow_html=True)
-st.sidebar.markdown("---")
-menu = st.sidebar.radio("MENU", ["DASHBOARD", "INTELLIGENCE AI", "PAYMENTS VAULT", "DATABASE"], label_visibility="collapsed")
+# --- INTERFACE ---
+st.sidebar.title("💠 BlueSDR")
+st.sidebar.caption("System v3.0 | Auto-Healing")
+menu = st.sidebar.radio("Menu", ["Dashboard", "Análise IA", "Banco de Dados"])
 
-# --- 7. PÁGINAS ---
-
-if menu == "DASHBOARD":
-    st.title("EXECUTIVE OVERVIEW")
-    if sheet_leads:
-        df = pd.DataFrame(sheet_leads.get_all_records())
-        if not df.empty:
-            c1, c2, c3, c4 = st.columns(4)
-            total = len(df)
-            quentes = len(df[df['Status'].astype(str).str.upper() == 'QUENTE'])
-            fechados = len(df[df['Status'].astype(str).str.upper() == 'FECHADO'])
-            conversao = (fechados/total*100) if total > 0 else 0
-            
-            c1.metric("TOTAL LEADS", total)
-            c2.metric("ACTIVE PIPELINE", quentes)
-            c3.metric("CLOSED DEALS", fechados)
-            c4.metric("CONVERSION RATE", f"{conversao:.1f}%")
-            
-            st.markdown("<br>", unsafe_allow_html=True)
-            col_graph1, col_graph2 = st.columns(2)
-            with col_graph1:
-                st.markdown("##### PIPELINE HEALTH")
-                fig = px.pie(df, names='Status', hole=0.6, color_discrete_sequence=['#4da6ff', '#ffffff', '#333333', '#111111'])
-                fig.update_layout(paper_bgcolor='rgba(0,0,0,0)', font_color='#666', showlegend=False)
-                st.plotly_chart(fig, use_container_width=True)
-        else:
-            st.info("NO DATA AVAILABLE")
-
-elif menu == "INTELLIGENCE AI":
-    st.title("CONVERSATION DECODER")
-    col_in, col_out = st.columns([1, 1])
-    with col_in:
-        txt = st.text_area("TRANSCRIPT INPUT", height=400, label_visibility="collapsed", placeholder="Paste conversation transcript here...")
-        if st.button("PROCESS DATA"):
-            with st.spinner("PROCESSING..."):
-                res = analisar_conversa_pro(txt)
-                st.session_state['analise_last'] = res.split('|')
-
-    with col_out:
-        if 'analise_last' in st.session_state and len(st.session_state['analise_last']) >= 6:
-            dados = st.session_state['analise_last']
-            st.markdown("##### ANALYSIS REPORT")
-            st.markdown(f"**LEAD:** {dados[0]} <br> **STATUS:** {dados[2]}", unsafe_allow_html=True)
-            st.markdown(f"<div style='background-color:#141414; padding:15px; border-left:2px solid #4da6ff; margin: 10px 0;'>{dados[3]}</div>", unsafe_allow_html=True)
-            st.markdown(f"**STRATEGY:** {dados[4]}")
-            st.text_area("SUGGESTED REPLY", value=dados[5], height=150)
-            
-            if st.button("ARCHIVE LEAD"):
-                ts = datetime.now().strftime("%d/%m/%Y %H:%M")
-                sheet_leads.append_row([ts, dados[0], dados[2], 0, f"Source: {dados[1]} | {dados[3]}"])
-                st.toast("DATA ARCHIVED")
-
-elif menu == "PAYMENTS VAULT":
-    st.title("PAYMENTS & ASSETS")
+# --- DASHBOARD ---
+if menu == "Dashboard":
+    st.title("📊 Visão Executiva")
     
-    if not sheet_pagamentos:
-        st.error("CONFIGURATION ERROR: MISSING 'Pagamentos' SHEET")
-    else:
-        with st.expander("REGISTER NEW TRANSACTION", expanded=True):
-            with st.form("pgto"):
-                c1, c2 = st.columns(2)
-                nome = c1.text_input("CLIENT NAME")
-                val = c1.number_input("VALUE", min_value=0.0)
-                data = c2.date_input("DATE")
-                hora = c2.time_input("TIME")
-                file = st.file_uploader("PROOF OF PAYMENT", type=['png','jpg','pdf'])
-                
-                if st.form_submit_button("CONFIRM UPLOAD"):
-                    if file and DRIVE_FOLDER_ID != "19B6Kl5M4A1VFWs_9ctlrojm72o56Wg3E?usp=drive_link":
-                        link = upload_to_drive(file, DRIVE_FOLDER_ID, drive_service)
-                        if link:
-                            sheet_pagamentos.append_row([datetime.now().strftime("%d/%m/%Y"), nome, val, "SDR", f"{data} {hora}", "Obs", link])
-                            st.success("TRANSACTION RECORDED")
-                            time.sleep(1)
-                            st.rerun()
-                    else:
-                        st.warning("CHECK DRIVE ID")
+    # Puxa dados reais
+    dados = sheet_leads.get_all_records()
+    df = pd.DataFrame(dados)
+
+    col1, col2, col3 = st.columns(3)
+    
+    if not df.empty:
+        total = len(df)
+        quentes = len(df[df['Status'].astype(str).str.contains('Quente', case=False, na=False)])
         
-        st.markdown("<br>", unsafe_allow_html=True)
-        df_pg = pd.DataFrame(sheet_pagamentos.get_all_records())
-        if not df_pg.empty:
-            if 'Link Comprovante' in df_pg.columns:
-                df_pg['ASSET'] = df_pg['Link Comprovante'].apply(lambda x: f'<a href="{x}" target="_blank" style="color:#4da6ff; text-decoration:none;">VIEW DOC</a>')
-                st.write(df_pg.drop(columns=['Link Comprovante']).to_html(escape=False, index=False), unsafe_allow_html=True)
+        col1.metric("Total de Leads", total)
+        col2.metric("🔥 Leads Quentes", quentes)
+        col3.metric("Meta Mensal", "R$ 50.000", "Em progresso")
+        
+        st.markdown("---")
+        
+        c1, c2 = st.columns(2)
+        with c1:
+            st.subheader("Temperatura")
+            fig = px.pie(df, names='Status', hole=0.4, color_discrete_sequence=px.colors.sequential.RdBu)
+            st.plotly_chart(fig, use_container_width=True)
+        with c2:
+            st.subheader("Últimos Registros")
+            st.dataframe(df.tail(5)[['Data', 'Nome', 'Status']], use_container_width=True, hide_index=True)
+    else:
+        st.info("Aguardando primeiros dados para gerar gráficos.")
 
-elif menu == "DATABASE":
-    st.title("DATA VAULT")
-    if sheet_leads:
+# --- ANÁLISE IA ---
+elif menu == "Análise IA":
+    st.title("🧠 Inteligência Comercial")
+    texto = st.text_area("Cole a conversa aqui:", height=200)
+    
+    if st.button("💠 ANALISAR AGORA"):
+        if texto:
+            with st.spinner("Processando neuro-linguística..."):
+                res = analisar_conversa(texto)
+                partes = res.split('|')
+                
+                if len(partes) >= 6:
+                    st.success("Análise Completa!")
+                    st.session_state['dados_temp'] = partes # Salva na memória temporária
+                    
+                    c1, c2 = st.columns(2)
+                    with c1:
+                        st.subheader(f"👤 {partes[0]}")
+                        st.info(f"**Origem:** {partes[1]}")
+                        st.warning(f"**Status:** {partes[2]}")
+                        st.error(f"**Dor:** {partes[3]}")
+                    with c2:
+                        st.subheader("💬 Sugestão de Resposta")
+                        st.code(partes[5], language="text")
+                else:
+                    st.error("A IA não conseguiu entender. Tente colar mais contexto.")
+
+    # Botão de Salvar aparece se tiver análise feita
+    if 'dados_temp' in st.session_state:
+        st.markdown("---")
+        if st.button("💾 SALVAR NO BANCO DE DADOS"):
+            p = st.session_state['dados_temp']
+            data = datetime.now().strftime("%d/%m/%Y %H:%M")
+            # Salva na ordem do cabeçalho: Data, Nome, Origem, Status, Dor, Sugestão
+            sheet_leads.append_row([data, p[0], p[1], p[2], p[3], p[5]])
+            st.toast("Salvo com sucesso!", icon="✅")
+            del st.session_state['dados_temp'] # Limpa memória
+            time.sleep(1)
+            st.rerun()
+
+# --- BANCO DE DADOS ---
+elif menu == "Banco de Dados":
+    st.title("📂 Vault de Dados")
+    tab1, tab2 = st.tabs(["Leads", "Pagamentos"])
+    
+    with tab1:
         st.dataframe(pd.DataFrame(sheet_leads.get_all_records()), use_container_width=True)
+    with tab2:
+        st.dataframe(pd.DataFrame(sheet_pagamentos.get_all_records()), use_container_width=True)
 
-# --- 8. RODAPÉ DE GRIFE ---
+# --- RODAPÉ ---
 st.markdown("""
     <div class="footer">
-        blue <span style='color:#4da6ff; font-weight:bold'>.</span> system &nbsp;|&nbsp; restricted access &nbsp;|&nbsp; engineered by leticia nascimento &copy; 2024
+        🔒 BlueSDR Enterprise System <br>
+        Developed by <b>Leticia Nascimento</b> © 2024
     </div>
     """, unsafe_allow_html=True)
